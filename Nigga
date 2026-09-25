@@ -1,0 +1,447 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- อัปเดตตัวละครเมื่อเกิดใหม่
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+	Character = newChar
+	Humanoid = Character:WaitForChild("Humanoid")
+	RootPart = Character:WaitForChild("HumanoidRootPart")
+end)
+
+---------------------------------------------------------
+-- 0. สร้าง FOV Circle (วงสีรุ้ง)
+---------------------------------------------------------
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 60
+FOVCircle.Radius = 100
+FOVCircle.Filled = false
+FOVCircle.Visible = false
+
+-- ระบบเปลี่ยนสีวงเป็นสีรุ้ง (Rainbow Effect)
+local hue = 0
+RunService.RenderStepped:Connect(function()
+	hue = (hue + 0.005) % 1
+	FOVCircle.Color = Color3.fromHSV(hue, 1, 1)
+	FOVCircle.Position = UserInputService:GetMouseLocation()
+end)
+
+---------------------------------------------------------
+-- 1. สร้าง หน้าต่าง UI หลัก (หมวดหมู่ + ย้ายตำแหน่งได้)
+---------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CategorizedUtilityGuiV2"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ปุ่มเปิด/ปิด UI ด้านข้าง
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 110, 0, 35)
+ToggleButton.Position = UDim2.new(0, 15, 0.5, -17)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Text = "เปิด/ปิด เมนู"
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 16
+ToggleButton.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+ToggleCorner.Parent = ToggleButton
+
+-- กรอบเมนูหลัก
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 380, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- แถบหัวข้อด้านบน (Top Bar)
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 10)
+TopBarCorner.Parent = TopBar
+
+local TopBarFix = Instance.new("Frame")
+TopBarFix.Size = UDim2.new(1, 0, 0, 10)
+TopBarFix.Position = UDim2.new(0, 0, 1, -10)
+TopBarFix.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+TopBarFix.BorderSizePixel = 0
+TopBarFix.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "เมนูควบคุม (Control Panel)"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- ปุ่มปิด X
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Position = UDim2.new(1, -30, 0, 5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.TextSize = 14
+CloseButton.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
+
+---------------------------------------------------------
+-- 2. เมนูหมวดหมู่ (Side Category Bar)
+---------------------------------------------------------
+local CategoryFrame = Instance.new("Frame")
+CategoryFrame.Name = "CategoryFrame"
+CategoryFrame.Size = UDim2.new(0, 110, 1, -35)
+CategoryFrame.Position = UDim2.new(0, 0, 0, 35)
+CategoryFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+CategoryFrame.BorderSizePixel = 0
+CategoryFrame.Parent = MainFrame
+
+-- ปุ่มหมวดหมู่ 1: การเคลื่อนที่
+local TabMoveBtn = Instance.new("TextButton")
+TabMoveBtn.Size = UDim2.new(1, -10, 0, 30)
+TabMoveBtn.Position = UDim2.new(0, 5, 0, 10)
+TabMoveBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+TabMoveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TabMoveBtn.Text = "การเคลื่อนที่"
+TabMoveBtn.Font = Enum.Font.SourceSansBold
+TabMoveBtn.TextSize = 14
+TabMoveBtn.Parent = CategoryFrame
+
+local Tab1Corner = Instance.new("UICorner")
+Tab1Corner.CornerRadius = UDim.new(0, 6)
+Tab1Corner.Parent = TabMoveBtn
+
+-- ปุ่มหมวดหมู่ 2: เวลา
+local TabTimeBtn = Instance.new("TextButton")
+TabTimeBtn.Size = UDim2.new(1, -10, 0, 30)
+TabTimeBtn.Position = UDim2.new(0, 5, 0, 45)
+TabTimeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+TabTimeBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+TabTimeBtn.Text = "ระบบเวลา"
+TabTimeBtn.Font = Enum.Font.SourceSansBold
+TabTimeBtn.TextSize = 14
+TabTimeBtn.Parent = CategoryFrame
+
+local Tab2Corner = Instance.new("UICorner")
+Tab2Corner.CornerRadius = UDim.new(0, 6)
+Tab2Corner.Parent = TabTimeBtn
+
+-- ปุ่มหมวดหมู่ 3: ล็อคเป้า (Aimbot)
+local TabAimBtn = Instance.new("TextButton")
+TabAimBtn.Size = UDim2.new(1, -10, 0, 30)
+TabAimBtn.Position = UDim2.new(0, 5, 0, 80)
+TabAimBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+TabAimBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+TabAimBtn.Text = "ระบบ Aim"
+TabAimBtn.Font = Enum.Font.SourceSansBold
+TabAimBtn.TextSize = 14
+TabAimBtn.Parent = CategoryFrame
+
+local Tab3Corner = Instance.new("UICorner")
+Tab3Corner.CornerRadius = UDim.new(0, 6)
+Tab3Corner.Parent = TabAimBtn
+
+---------------------------------------------------------
+-- 3. หน้าต่างเนื้อหาแต่ละหมวดหมู่ (Content Pages)
+---------------------------------------------------------
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Name = "ContentContainer"
+ContentContainer.Size = UDim2.new(1, -110, 1, -35)
+ContentContainer.Position = UDim2.new(0, 110, 0, 35)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+--- [หน้าหมวดหมู่ 1: การเคลื่อนที่] ---
+local MovePage = Instance.new("Frame")
+MovePage.Name = "MovePage"
+MovePage.Size = UDim2.new(1, 0, 1, 0)
+MovePage.BackgroundTransparency = 1
+MovePage.Visible = true
+MovePage.Parent = ContentContainer
+
+local TPWalkLabel = Instance.new("TextLabel")
+TPWalkLabel.Size = UDim2.new(1, -20, 0, 20)
+TPWalkLabel.Position = UDim2.new(0, 10, 0, 10)
+TPWalkLabel.BackgroundTransparency = 1
+TPWalkLabel.Text = "ระดับความเร็ว (ใส่น้อยๆ ก็เร็ว):"
+TPWalkLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TPWalkLabel.Font = Enum.Font.SourceSans
+TPWalkLabel.TextSize = 14
+TPWalkLabel.TextXAlignment = Enum.TextXAlignment.Left
+TPWalkLabel.Parent = MovePage
+
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(1, -20, 0, 30)
+SpeedInput.Position = UDim2.new(0, 10, 0, 35)
+SpeedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+SpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedInput.Text = "2"
+SpeedInput.PlaceholderText = "ใส่ระดับความเร็ว..."
+SpeedInput.Font = Enum.Font.SourceSans
+SpeedInput.TextSize = 16
+SpeedInput.Parent = MovePage
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = SpeedInput
+
+local TPWalkBtn = Instance.new("TextButton")
+TPWalkBtn.Size = UDim2.new(1, -20, 0, 35)
+TPWalkBtn.Position = UDim2.new(0, 10, 0, 75)
+TPWalkBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- เริ่มต้น ปิด = สีแดง
+TPWalkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TPWalkBtn.Text = "ระบบวาร์ปเดิน: ปิดใช้งาน"
+TPWalkBtn.Font = Enum.Font.SourceSansBold
+TPWalkBtn.TextSize = 15
+TPWalkBtn.Parent = MovePage
+
+local TPBtnCorner = Instance.new("UICorner")
+TPBtnCorner.CornerRadius = UDim.new(0, 6)
+TPBtnCorner.Parent = TPWalkBtn
+
+--- [หน้าหมวดหมู่ 2: ระบบเวลา] ---
+local TimePage = Instance.new("Frame")
+TimePage.Name = "TimePage"
+TimePage.Size = UDim2.new(1, 0, 1, 0)
+TimePage.BackgroundTransparency = 1
+TimePage.Visible = false
+TimePage.Parent = ContentContainer
+
+local FreezeBtn = Instance.new("TextButton")
+FreezeBtn.Size = UDim2.new(1, -20, 0, 35)
+FreezeBtn.Position = UDim2.new(0, 10, 0, 15)
+FreezeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- เริ่มต้น ปิด = สีแดง
+FreezeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FreezeBtn.Text = "หยุดเวลา: ปิดใช้งาน"
+FreezeBtn.Font = Enum.Font.SourceSansBold
+FreezeBtn.TextSize = 15
+FreezeBtn.Parent = TimePage
+
+local FreezeBtnCorner = Instance.new("UICorner")
+FreezeBtnCorner.CornerRadius = UDim.new(0, 6)
+FreezeBtnCorner.Parent = FreezeBtn
+
+--- [หน้าหมวดหมู่ 3: ระบบ Aim] ---
+local AimPage = Instance.new("Frame")
+AimPage.Name = "AimPage"
+AimPage.Size = UDim2.new(1, 0, 1, 0)
+AimPage.BackgroundTransparency = 1
+AimPage.Visible = false
+AimPage.Parent = ContentContainer
+
+local AimBtn = Instance.new("TextButton")
+AimBtn.Size = UDim2.new(1, -20, 0, 35)
+AimBtn.Position = UDim2.new(0, 10, 0, 10)
+AimBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- เริ่มต้น ปิด = สีแดง
+AimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimBtn.Text = "ระบบ Aimbot: ปิดใช้งาน"
+AimBtn.Font = Enum.Font.SourceSansBold
+AimBtn.TextSize = 15
+AimBtn.Parent = AimPage
+
+local AimBtnCorner = Instance.new("UICorner")
+AimBtnCorner.CornerRadius = UDim.new(0, 6)
+AimBtnCorner.Parent = AimBtn
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Size = UDim2.new(1, -20, 0, 20)
+FOVLabel.Position = UDim2.new(0, 10, 0, 55)
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Text = "ขนาดวงรุ้ง FOV:"
+FOVLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+FOVLabel.Font = Enum.Font.SourceSans
+FOVLabel.TextSize = 14
+FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
+FOVLabel.Parent = AimPage
+
+local FOVInput = Instance.new("TextBox")
+FOVInput.Size = UDim2.new(1, -20, 0, 30)
+FOVInput.Position = UDim2.new(0, 10, 0, 80)
+FOVInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+FOVInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVInput.Text = "100"
+FOVInput.PlaceholderText = "ปรับขนาดวง เช่น 50, 100, 200..."
+FOVInput.Font = Enum.Font.SourceSans
+FOVInput.TextSize = 16
+FOVInput.Parent = AimPage
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(0, 6)
+FOVCorner.Parent = FOVInput
+
+---------------------------------------------------------
+-- 4. ระบบสลับหมวดหมู่ และการเปิด/ปิด GUI
+---------------------------------------------------------
+
+local isGuiVisible = true
+local function toggleGui()
+	isGuiVisible = not isGuiVisible
+	MainFrame.Visible = isGuiVisible
+end
+
+CloseButton.MouseButton1Click:Connect(toggleGui)
+ToggleButton.MouseButton1Click:Connect(toggleGui)
+
+-- ระบบสลับ Tab
+local function switchTab(activePage, activeBtn)
+	MovePage.Visible = false
+	TimePage.Visible = false
+	AimPage.Visible = false
+	
+	TabMoveBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	TabMoveBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	TabTimeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	TabTimeBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	TabAimBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+	TabAimBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	
+	activePage.Visible = true
+	activeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+	activeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+TabMoveBtn.MouseButton1Click:Connect(function() switchTab(MovePage, TabMoveBtn) end)
+TabTimeBtn.MouseButton1Click:Connect(function() switchTab(TimePage, TabTimeBtn) end)
+TabAimBtn.MouseButton1Click:Connect(function() switchTab(AimPage, TabAimBtn) end)
+
+---------------------------------------------------------
+-- 5. ฟังก์ชันการทำงาน (LOGIC)
+---------------------------------------------------------
+
+--- [1. TP Walk] ---
+local tpWalkEnabled = false
+local tpMultiplier = 2
+
+SpeedInput.FocusLost:Connect(function()
+	local num = tonumber(SpeedInput.Text)
+	if num then
+		tpMultiplier = num
+	else
+		SpeedInput.Text = tostring(tpMultiplier)
+	end
+end)
+
+TPWalkBtn.MouseButton1Click:Connect(function()
+	tpWalkEnabled = not tpWalkEnabled
+	if tpWalkEnabled then
+		TPWalkBtn.Text = "ระบบวาร์ปเดิน: เปิดใช้งาน"
+		TPWalkBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- เปิด = สีเขียว
+	else
+		TPWalkBtn.Text = "ระบบวาร์ปเดิน: ปิดใช้งาน"
+		TPWalkBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- ปิด = สีแดง
+	end
+end)
+
+RunService.Heartbeat:Connect(function()
+	if tpWalkEnabled and Character and Humanoid and RootPart then
+		if Humanoid.MoveDirection.Magnitude > 0 then
+			RootPart.CFrame = RootPart.CFrame + (Humanoid.MoveDirection * (tpMultiplier * 0.5))
+		end
+	end
+end)
+
+--- [2. หยุดเวลา] ---
+local timeFrozen = false
+
+FreezeBtn.MouseButton1Click:Connect(function()
+	timeFrozen = not timeFrozen
+	if timeFrozen then
+		FreezeBtn.Text = "หยุดเวลา: เปิดใช้งาน"
+		FreezeBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- เปิด = สีเขียว
+		if RootPart then RootPart.Anchored = true end
+	else
+		FreezeBtn.Text = "หยุดเวลา: ปิดใช้งาน"
+		FreezeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- ปิด = สีแดง
+		if RootPart then RootPart.Anchored = false end
+	end
+end)
+
+--- [3. Aimbot + FOV Circle] ---
+local aimbotEnabled = false
+
+AimBtn.MouseButton1Click:Connect(function()
+	aimbotEnabled = not aimbotEnabled
+	if aimbotEnabled then
+		AimBtn.Text = "ระบบ Aimbot: เปิดใช้งาน"
+		AimBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- เปิด = สีเขียว
+		FOVCircle.Visible = true
+	else
+		AimBtn.Text = "ระบบ Aimbot: ปิดใช้งาน"
+		AimBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- ปิด = สีแดง
+		FOVCircle.Visible = false
+	end
+end)
+
+FOVInput.FocusLost:Connect(function()
+	local num = tonumber(FOVInput.Text)
+	if num then
+		FOVCircle.Radius = num
+	else
+		FOVInput.Text = tostring(FOVCircle.Radius)
+	end
+end)
+
+-- ค้นหาเป้าหมายที่ใกล้เมาส์ที่สุดภายในวง FOV
+local function getClosestPlayer()
+	local closestPlayer = nil
+	local shortestDistance = FOVCircle.Radius
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+			local headPos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+			if onScreen then
+				local mousePos = UserInputService:GetMouseLocation()
+				local distance = (Vector2.new(headPos.X, headPos.Y) - mousePos).Magnitude
+				
+				if distance < shortestDistance then
+					shortestDistance = distance
+					closestPlayer = player
+				end
+			end
+		end
+	end
+	return closestPlayer
+end
+
+-- หันกล้องไปทางเป้าหมายทุกเฟรม
+RunService.RenderStepped:Connect(function()
+	if aimbotEnabled then
+		local target = getClosestPlayer()
+		if target and target.Character and target.Character:FindFirstChild("Head") then
+			Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+		end
+	end
+end)
